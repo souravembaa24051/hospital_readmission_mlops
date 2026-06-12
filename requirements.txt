@@ -1,0 +1,15 @@
+pandas
+numpy
+scikit-learn
+xgboost
+lightgbm
+mlflow
+shap
+fastapi
+uvicorn
+joblib
+evidently
+prometheus-client
+matplotlib
+seaborn
+jupyter
