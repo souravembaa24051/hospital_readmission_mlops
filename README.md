@@ -1,134 +1,165 @@
-# Hospital Readmission Prediction – End-to-End MLOps Project
+# Hospital Readmission Prediction - End-to-End MLOps Project
 
-## Project Overview
+## Overview
 
-Hospital readmissions within 30 days are a major challenge for healthcare providers, impacting patient outcomes and increasing healthcare costs. This project develops a machine learning solution to predict whether a diabetic patient is likely to be readmitted within 30 days of discharge.
+This project develops a machine learning solution to predict whether a diabetic patient will be readmitted to the hospital within 30 days of discharge. The solution demonstrates a complete Machine Learning Operations (MLOps) workflow, including data preprocessing, model development, experiment tracking, explainability, API deployment, and containerization.
 
-The project demonstrates a complete MLOps workflow, including data preprocessing, model development, experiment tracking, explainability, API deployment, and containerization.
+The project uses the Diabetes 130-US Hospitals dataset and implements both baseline and advanced machine learning models to identify patients at risk of readmission.
 
 ---
 
 ## Business Problem
 
-Early identification of patients at high risk of readmission enables hospitals to:
+Hospital readmissions are a significant challenge for healthcare systems because they:
 
-* Improve patient care and outcomes
-* Reduce avoidable readmissions
-* Optimize resource allocation
-* Lower healthcare costs
-* Support clinical decision-making
+* Increase healthcare costs
+* Reduce operational efficiency
+* Indicate potential gaps in patient care
+* Impact patient outcomes
 
-The objective is to predict whether a patient will be readmitted within 30 days using historical hospital encounter data.
+Predicting readmissions allows hospitals to proactively identify high-risk patients and implement intervention strategies before discharge.
+
+---
+
+## Project Objectives
+
+* Predict whether a patient will be readmitted within 30 days
+* Prevent data leakage through patient-level train/test splitting
+* Compare baseline and advanced machine learning models
+* Track experiments using MLflow
+* Explain model predictions using SHAP
+* Deploy the model through a FastAPI service
+* Containerize the application using Docker
 
 ---
 
 ## Dataset
 
-**Source:** Diabetes 130-US Hospitals Dataset
+### Source
 
-* 101,766 patient encounters
-* 50 original features
-* Multiple encounters per patient
-* Readmission outcomes:
+Diabetes 130-US Hospitals Dataset
 
-  * `<30` : Readmitted within 30 days
-  * `>30` : Readmitted after 30 days
-  * `NO` : No readmission
+### Dataset Characteristics
+
+| Metric                                |   Value |
+| ------------------------------------- | ------: |
+| Total Records                         | 101,766 |
+| Original Features                     |      50 |
+| Positive Class (<30 Days Readmission) |  11,357 |
+| Negative Class                        |  90,409 |
 
 ### Target Variable
 
-Binary classification target:
+The original target column is:
 
-* 1 = Readmitted within 30 days (`<30`)
-* 0 = Not readmitted within 30 days
+```text
+readmitted
+```
 
-Class distribution:
+Converted into:
 
-| Class |  Count |
-| ----- | -----: |
-| 0     | 90,409 |
-| 1     | 11,357 |
-
-The dataset is highly imbalanced, with approximately 11% positive cases.
+| Value | Meaning                       |
+| ----- | ----------------------------- |
+| 1     | Readmitted within 30 days     |
+| 0     | Not readmitted within 30 days |
 
 ---
 
-## Project Architecture
+## Data Processing
+
+### Missing Value Handling
+
+The dataset contains missing values represented by:
 
 ```text
-Data Ingestion
-      ↓
-Data Cleaning
-      ↓
-Feature Engineering
-      ↓
-Patient-Level Train/Test Split
-      ↓
-Model Training
-      ↓
-MLflow Tracking
-      ↓
-SHAP Explainability
-      ↓
-FastAPI Deployment
-      ↓
-Docker Containerization
+?
+```
+
+These were converted to:
+
+```python
+np.nan
+```
+
+### High Missing Columns Removed
+
+The following columns were removed due to excessive missing values:
+
+* weight
+* payer_code
+* medical_specialty
+
+### Data Leakage Prevention
+
+Multiple encounters may belong to the same patient.
+
+To prevent leakage:
+
+```python
+GroupShuffleSplit(
+    groups=df["patient_nbr"]
+)
+```
+
+was used to ensure that the same patient never appears in both training and testing datasets.
+
+---
+
+## Exploratory Data Analysis (EDA)
+
+The following visualizations were generated:
+
+### 1. Target Distribution
+
+* Demonstrates severe class imbalance
+* Approximately 11% positive cases
+
+### 2. Age vs Readmission
+
+* Analyzes readmission patterns across age groups
+
+### 3. Time in Hospital Distribution
+
+* Shows patient stay duration distribution
+
+### 4. Gender vs Readmission
+
+* Compares readmission patterns by gender
+
+### 5. Correlation Heatmap
+
+* Examines relationships among numerical features
+
+### 6. Top Diagnoses
+
+* Displays the most frequent primary diagnosis codes
+
+Generated files:
+
+```text
+reports/eda/
+├── target_distribution.png
+├── age_vs_readmission.png
+├── time_in_hospital_distribution.png
+├── gender_vs_readmission.png
+├── correlation_heatmap.png
+└── top_diagnoses.png
 ```
 
 ---
 
-## Data Preprocessing
+## Machine Learning Models
 
-### Missing Value Handling
-
-The dataset contains missing values represented by `?`.
-
-Actions performed:
-
-* Replaced `?` with null values
-* Dropped high-missing columns:
-
-  * weight
-  * payer_code
-  * medical_specialty
-* Applied median imputation for numerical features
-* Applied constant imputation for categorical features
-
-### Data Leakage Prevention
-
-The dataset contains multiple encounters for the same patient.
-
-To prevent data leakage:
-
-* Used `GroupShuffleSplit`
-* Split performed using `patient_nbr`
-* Ensured the same patient never appears in both train and test sets
-
----
-
-## Feature Engineering
-
-Features used include:
-
-* Demographics
-* Admission details
-* Laboratory procedures
-* Medication information
-* Diagnosis codes
-* Hospital utilization metrics
-
-Categorical features were encoded using One-Hot Encoding.
-
----
-
-## Models Implemented
-
-### Logistic Regression Baseline
+### Logistic Regression (Baseline)
 
 Configuration:
 
-* Class Weight = Balanced
-* Max Iterations = 1000
+```python
+LogisticRegression(
+    class_weight="balanced",
+    max_iter=1000
+)
+```
 
 Results:
 
@@ -139,16 +170,20 @@ Results:
 
 ---
 
-### XGBoost Model
+### XGBoost (Final Model)
 
 Configuration:
 
-* n_estimators = 300
-* max_depth = 5
-* learning_rate = 0.05
-* subsample = 0.8
-* colsample_bytree = 0.8
-* scale_pos_weight = 8
+```python
+XGBClassifier(
+    n_estimators=300,
+    max_depth=5,
+    learning_rate=0.05,
+    subsample=0.8,
+    colsample_bytree=0.8,
+    scale_pos_weight=8
+)
+```
 
 Results:
 
@@ -157,62 +192,62 @@ Results:
 | PR-AUC  | 0.2100 |
 | ROC-AUC | 0.6728 |
 
-### Improvement over Baseline
+### Performance Improvement
 
 | Metric  | Logistic Regression | XGBoost |
 | ------- | ------------------: | ------: |
 | PR-AUC  |              0.1825 |  0.2100 |
 | ROC-AUC |              0.6333 |  0.6728 |
 
-The XGBoost model achieved superior performance and was selected as the final production model.
+XGBoost was selected as the production model.
 
 ---
 
 ## Experiment Tracking with MLflow
 
-MLflow was used for:
+MLflow was used to:
 
-* Experiment tracking
-* Parameter logging
-* Metric tracking
-* Model artifact storage
+* Track experiments
+* Store parameters
+* Log evaluation metrics
+* Save model artifacts
 
-Tracked Metrics:
+Tracked metrics include:
 
 * PR-AUC
 * ROC-AUC
 
-Tracked Parameters:
+Experiment Name:
 
-* Model type
-* Number of estimators
-* Tree depth
-* Learning rate
+```text
+Hospital_Readmission
+```
 
 ---
 
 ## Model Explainability
 
-SHAP (SHapley Additive exPlanations) was used to interpret model predictions.
+SHAP (SHapley Additive exPlanations) was used to explain model behavior.
 
-Generated Artifacts:
+Generated Artifact:
 
-* SHAP Summary Plot
-* Global Feature Importance Analysis
+```text
+reports/shap_summary.png
+```
 
 Benefits:
 
-* Improved model transparency
+* Global feature importance analysis
+* Transparent model interpretation
 * Better understanding of prediction drivers
-* Support for stakeholder communication
 
 ---
 
 ## API Deployment
 
-The trained model is deployed using FastAPI.
+The trained XGBoost model is deployed using FastAPI.
 
-### Health Check
+### Health Check Endpoint
 
 ```http
 GET /
@@ -232,7 +267,7 @@ Response:
 POST /predict
 ```
 
-Response:
+Sample Response:
 
 ```json
 {
@@ -251,19 +286,19 @@ http://127.0.0.1:8000/docs
 
 ## Docker Deployment
 
-Build Image:
+### Build Image
 
 ```bash
 docker build -t hospital-readmission .
 ```
 
-Run Container:
+### Run Container
 
 ```bash
 docker run -p 8000:8000 hospital-readmission
 ```
 
-API Access:
+### Access API
 
 ```text
 http://127.0.0.1:8000/docs
@@ -282,15 +317,20 @@ hospital_readmission_mlops/
 ├── data/
 │   └── raw/
 │
+├── reports/
+│   ├── eda/
+│   └── shap_summary.png
+│
 ├── src/
+│   ├── test_load.py
+│   ├── preprocessing.py
+│   ├── clean_data.py
+│   ├── split_data.py
 │   ├── train.py
 │   ├── train_xgboost.py
 │   ├── train_xgboost_mlflow.py
-│   └── shap_explain.py
-│
-├── models/
-│
-├── reports/
+│   ├── shap_explain.py
+│   └── eda_visualization.py
 │
 ├── Dockerfile
 ├── requirements.txt
@@ -305,27 +345,42 @@ hospital_readmission_mlops/
 * Python
 * Pandas
 * NumPy
+* Matplotlib
+* Seaborn
 * Scikit-Learn
 * XGBoost
 * MLflow
 * SHAP
 * FastAPI
+* Uvicorn
 * Docker
 * Joblib
 
 ---
 
+## Key Learnings
+
+* Handling healthcare data with class imbalance
+* Preventing patient-level data leakage
+* Building reusable machine learning pipelines
+* Experiment tracking with MLflow
+* Model explainability with SHAP
+* Serving models through FastAPI
+* Containerization using Docker
+
+---
+
 ## Future Improvements
 
-* Hyperparameter optimization
-* Feature store integration
-* CI/CD pipeline implementation
-* Model monitoring with Prometheus
-* Drift detection using Evidently AI
-* Cloud deployment (AWS/Azure/GCP)
+* Hyperparameter tuning using Optuna
+* CI/CD pipeline integration
+* Prometheus monitoring
+* Grafana dashboards
+* Data drift detection with Evidently AI
+* Cloud deployment (Azure/AWS/GCP)
 
 ---
 
 ## Conclusion
 
-This project demonstrates an end-to-end machine learning and MLOps workflow for predicting hospital readmissions. The final XGBoost model achieved improved predictive performance over the baseline model while maintaining explainability and deployability through SHAP, MLflow, FastAPI, and Docker.
+This project demonstrates a complete end-to-end MLOps workflow for hospital readmission prediction. Starting from raw healthcare data, the project progresses through data preparation, machine learning modeling, experiment tracking, explainability, deployment, and containerization. The final XGBoost model outperformed the Logistic Regression baseline and was successfully deployed through a FastAPI service.
