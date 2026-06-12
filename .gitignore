@@ -11,18 +11,6 @@ __pycache__/
 # Jupyter
 .ipynb_checkpoints/
 
-# MLflow
-mlruns/
-mlartifacts/
-
-# Databases
-*.db
-
-# Models
-models/
-
-# Reports
-reports/
 
 # VS Code
 .vscode/
